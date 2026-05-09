@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AVERIX PsicoEscolar</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <img id="app-logo" class="sidebar-logo" alt="Avellana" />
+        <div class="brand-text">
+          <span class="brand-name">AVERIX</span>
+          <span class="brand-sub">PsicoEscolar Profesional</span>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <a class="nav-item" data-view="dashboard" onclick="switchView('dashboard')">🏠 Dashboard</a>
+        <a class="nav-item" data-view="students" onclick="switchView('students')">👨‍🎓 Estudiantes</a>
+        <a class="nav-item" data-view="observations" onclick="switchView('observations')">👁️ Observaciones</a>
+        <a class="nav-item" data-view="evaluations" onclick="switchView('evaluations')">📊 Evaluaciones</a>
+        <a class="nav-item" data-view="interventions" onclick="switchView('interventions')">🎯 Intervenciones</a>
+        <a class="nav-item" data-view="activities" onclick="switchView('activities')">🎨 Actividades</a>
+        <a class="nav-item" data-view="meetings" onclick="switchView('meetings')">🤝 Reuniones</a>
+        <a class="nav-item" data-view="bitacora" onclick="switchView('bitacora')">📔 Bitácora</a>
+        <a class="nav-item" data-view="reports" onclick="switchView('reports')">📄 Informes APA</a>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div id="view-dashboard" class="view"></div>
+      <div id="view-students" class="view" style="display:none"></div>
+      <div id="view-observations" class="view" style="display:none"></div>
+      <div id="view-evaluations" class="view" style="display:none"></div>
+      <div id="view-interventions" class="view" style="display:none"></div>
+      <div id="view-activities" class="view" style="display:none"></div>
+      <div id="view-meetings" class="view" style="display:none"></div>
+      <div id="view-bitacora" class="view" style="display:none"></div>
+      <div id="view-reports" class="view" style="display:none"></div>
+    </main>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal-overlay" class="modal-overlay" onclick="handleOverlayClick(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h2 id="modal-title" class="modal-title">Modal</h2>
+        <button class="modal-close-btn" onclick="closeModal()">✕</button>
+      </div>
+      <div id="modal-body" class="modal-body"></div>
+      <div id="modal-footer" class="modal-footer"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Libraries via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <!-- App scripts (order matters) -->
+  <script src="assets/logo.js"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/students.js"></script>
+  <script src="js/observations.js"></script>
+  <script src="js/evaluations.js"></script>
+  <script src="js/interventions.js"></script>
+  <script src="js/activities.js"></script>
+  <script src="js/meetings.js"></script>
+  <script src="js/bitacora.js"></script>
+  <script src="js/reports.js"></script>
+</body>
+</html>
