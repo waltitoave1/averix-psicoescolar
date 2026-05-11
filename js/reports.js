@@ -1,293 +1,193 @@
 // ============================================================
-//  Informes APA Module — APA 7th edition psychopedagogical report
+//  Reports Module — Informes APA completos en WORD
 // ============================================================
 
-function renderReports() {
+async function loadReports() {
   const el = document.getElementById('view-reports');
-
-  const studentOpts = studentOptions('');
-  const reportTypeOpts = ['Progreso', 'Diagnóstico', 'Derivación'].map(t =>
-    `<option value="${t}">${t}</option>`
+  const studentOpts = App.students.map(s => 
+    `<option value="${s.id}">${s.name} - ${s.grade}</option>`
   ).join('');
 
   el.innerHTML = `
     <div class="view-header">
-      <h1 class="page-title">Informes APA</h1>
-      <p class="page-desc">Generación de informes psicopedagógicos en formato APA 7ma edición</p>
+      <h1 class="page-title">Informes Psicopedagógicos</h1>
+      <p class="page-desc">Genera informes completos en formato Word</p>
     </div>
-    <div class="report-form-card">
-      <div class="form-group">
-        <label class="form-label">Profesional a cargo <span>*</span></label>
-        <input id="r-psych" class="form-input" type="text" placeholder="Nombre completo del/la psicopedagoga" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Institución</label>
-        <input id="r-inst" class="form-input" type="text" placeholder="Nombre del establecimiento educacional" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Estudiante <span>*</span></label>
-        <select id="r-student" class="form-select">${studentOpts}</select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Tipo de informe</label>
-        <select id="r-type" class="form-select">${reportTypeOpts}</select>
-      </div>
-      <br>
-      <button class="btn btn-primary" style="width:100%;justify-content:center;font-size:15px;padding:14px" onclick="generateApaReport()">
-        📄 Generar Informe APA
-      </button>
+    <div class="card">
+      <form onsubmit="generateReport(event)" style="max-width: 600px;">
+        <div class="form-group">
+          <label class="form-label">Estudiante <span>*</span></label>
+          <select id="rep-student" class="form-select" required>
+            <option value="">Seleccionar estudiante...</option>
+            ${studentOpts}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Profesional</label>
+          <input id="rep-professional" class="form-input" type="text" placeholder="Nombre del profesional" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Institución</label>
+          <input id="rep-institution" class="form-input" type="text" placeholder="Nombre de la institución" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo de informe</label>
+          <select id="rep-type" class="form-select">
+            <option>Informe de Progreso</option>
+            <option>Informe Diagnóstico</option>
+            <option>Informe de Derivación</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary">📄 Generar Informe Word</button>
+      </form>
     </div>
   `;
 }
-window.renderReports = renderReports;
+window.loadReports = loadReports;
 
-async function generateApaReport() {
-  const psychName = document.getElementById('r-psych').value.trim();
-  const institution = document.getElementById('r-inst').value.trim();
-  const studentId = document.getElementById('r-student').value;
-  const reportType = document.getElementById('r-type').value;
+async function generateReport(e) {
+  e.preventDefault();
+  
+  const studentId = document.getElementById('rep-student').value;
+  if (!studentId) {
+    showToast('Selecciona un estudiante.', 'error');
+    return;
+  }
 
-  if (!psychName) { showToast('El nombre del profesional es obligatorio.', 'error'); return; }
-  if (!studentId) { showToast('Selecciona un estudiante.', 'error'); return; }
+  const professional = document.getElementById('rep-professional').value || 'Profesional Psicopedagogo/a';
+  const institution = document.getElementById('rep-institution').value || 'Institución Educativa';
+  const reportType = document.getElementById('rep-type').value;
 
-  showToast('Generando informe...');
+  const student = App.students.find(s => s.id === studentId);
+  
+  // Obtener TODOS los datos del estudiante
+  const observations = await dbOperation('observations', 'get');
+  const evaluations = await dbOperation('evaluations', 'get');
+  const interventions = await dbOperation('interventions', 'get');
+  const meetings = await dbOperation('meetings', 'get');
+  const bitacoras = await dbOperation('bitacora', 'get');
 
-  const [
-    { data: student },
-    { data: obsData },
-    { data: evalData },
-  ] = await Promise.all([
-    db.from('students').select('*').eq('id', studentId).single(),
-    db.from('observations').select('*').eq('student_id', studentId).order('date', { ascending: false }).limit(5),
-    db.from('evaluations').select('*').eq('student_id', studentId).order('date', { ascending: false }),
-  ]);
+  const studentObs = observations.filter(o => o.student_id === studentId);
+  const studentEvals = evaluations.filter(e => e.student_id === studentId);
+  const studentInts = interventions.filter(i => i.student_id === studentId);
+  const studentMeets = meetings.filter(m => m.student_id === studentId);
+  const studentBit = bitacoras.filter(b => b.student_id === studentId);
 
-  if (!student) { showToast('No se encontró el estudiante.', 'error'); return; }
+  const { Document, Packer, Paragraph, HeadingLevel, AlignmentType, TextRun, TabStopType, TabStopPosition } = docx;
 
-  buildApaPDF({ student, observations: obsData || [], evaluations: evalData || [], psychName, institution, reportType });
-}
-window.generateApaReport = generateApaReport;
+  const sections = [];
 
-function buildApaPDF({ student, observations, evaluations, psychName, institution, reportType }) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  // ENCABEZADO
+  sections.push(
+    new Paragraph({ text: reportType.toUpperCase(), heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
+    new Paragraph({ text: "", spacing: { after: 200 } }),
+    new Paragraph({ text: `Estudiante: ${student.name}` }),
+    new Paragraph({ text: `RUT: ${student.rut || 'No registrado'}` }),
+    new Paragraph({ text: `Curso: ${student.grade}` }),
+    new Paragraph({ text: `Diagnóstico: ${student.diagnosis || 'Sin diagnóstico registrado'}` }),
+    new Paragraph({ text: `Fecha del informe: ${new Date().toLocaleDateString('es-CL')}` }),
+    new Paragraph({ text: `Profesional: ${professional}` }),
+    new Paragraph({ text: `Institución: ${institution}` }),
+    new Paragraph({ text: "", spacing: { after: 300 } })
+  );
 
-  const ml = 25, mr = 185, cw = 160;
-  let y = 25;
-
-  const today = new Date().toLocaleDateString('es-CL', {
-    year: 'numeric', month: 'long', day: 'numeric'
-  });
-
-  // ─── Header ──────────────────────────────────────────────
-  doc.setFont('times', 'bold');
-  doc.setFontSize(14);
-  doc.setTextColor(42, 26, 31);
-  doc.text('INFORME PSICOPEDAGÓGICO', 105, y, { align: 'center' });
-  y += 6;
-  doc.setFont('times', 'normal');
-  doc.setFontSize(11);
-  doc.text(`Tipo: ${reportType}`, 105, y, { align: 'center' });
-  y += 5;
-  doc.setFont('times', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(107, 78, 90);
-  doc.text(`Formato APA 7ma Edición`, 105, y, { align: 'center' });
-  y += 2;
-  doc.setDrawColor(42, 26, 31);
-  doc.setLineWidth(0.8);
-  doc.line(ml, y + 3, mr, y + 3);
-  y += 10;
-
-  // ─── Student Data ─────────────────────────────────────────
-  doc.setFont('times', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(42, 26, 31);
-  doc.text('I. DATOS DEL ESTUDIANTE', ml, y);
-  y += 7;
-
-  doc.setFont('times', 'normal');
-  doc.setFontSize(10);
-  const bdate = student.birthdate ? fmtDate(student.birthdate) : '—';
-  const rows = [
-    ['Nombre completo', student.name],
-    ['RUT', student.rut || '—'],
-    ['Fecha de nacimiento', bdate],
-    ['Curso / Nivel', student.grade || '—'],
-    ['Diagnóstico', student.diagnosis || '—'],
-    ['Institución', institution || '—'],
-    ['Profesional evaluador/a', psychName],
-    ['Fecha de informe', today],
-  ];
-
-  rows.forEach(([label, val]) => {
-    doc.setFont('times', 'bold');
-    doc.text(`${label}:`, ml, y);
-    doc.setFont('times', 'normal');
-    doc.text(String(val), ml + 52, y);
-    y += 5;
-  });
-
-  y += 3;
-  doc.setLineWidth(0.3);
-  doc.setDrawColor(200, 200, 200);
-  doc.line(ml, y, mr, y);
-  y += 7;
-
-  // ─── Observations ─────────────────────────────────────────
-  if (y > 240) { doc.addPage(); y = 25; }
-
-  doc.setFont('times', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(42, 26, 31);
-  doc.text('II. OBSERVACIONES RECIENTES', ml, y);
-  y += 7;
-
-  if (observations.length === 0) {
-    doc.setFont('times', 'italic');
-    doc.setFontSize(10);
-    doc.text('Sin observaciones registradas.', ml, y);
-    y += 7;
-  } else {
-    observations.forEach((obs, i) => {
-      if (y > 245) { doc.addPage(); y = 25; }
-      doc.setFont('times', 'bold');
-      doc.setFontSize(10);
-      doc.text(`${i + 1}. ${obs.area || 'Sin área'} — ${fmtDate(obs.date)}`, ml, y);
-      y += 5;
-      doc.setFont('times', 'normal');
-      const lines = doc.splitTextToSize(obs.text || '', cw);
-      doc.text(lines, ml + 4, y);
-      y += lines.length * 4.5 + 3;
+  // OBSERVACIONES
+  if (studentObs.length > 0) {
+    sections.push(
+      new Paragraph({ text: "OBSERVACIONES", heading: HeadingLevel.HEADING_2 }),
+      new Paragraph({ text: "" })
+    );
+    studentObs.forEach((obs, i) => {
+      sections.push(
+        new Paragraph({ text: `${i + 1}. Fecha: ${new Date(obs.date).toLocaleDateString('es-CL')} - ${obs.area || 'General'}`, bold: true }),
+        new Paragraph({ text: obs.text }),
+        new Paragraph({ text: "" })
+      );
     });
   }
 
-  y += 2;
-  doc.line(ml, y, mr, y);
-  y += 7;
-
-  // ─── Evaluations ─────────────────────────────────────────
-  if (y > 230) { doc.addPage(); y = 25; }
-
-  doc.setFont('times', 'bold');
-  doc.setFontSize(12);
-  doc.text('III. RESULTADOS DE EVALUACIÓN', ml, y);
-  y += 7;
-
-  if (evaluations.length === 0) {
-    doc.setFont('times', 'italic');
-    doc.setFontSize(10);
-    doc.text('Sin evaluaciones registradas.', ml, y);
-    y += 7;
-  } else {
-    // Table header
-    const ecols = [70, 40, 30, 20];
-    const eheaders = ['Área', 'Instrumento', 'Fecha', 'Ptje'];
-    doc.setFont('times', 'bold');
-    doc.setFontSize(9);
-    let ex = ml;
-    eheaders.forEach((h, i) => { doc.text(h, ex, y); ex += ecols[i]; });
-    y += 4;
-    doc.line(ml, y, mr, y);
-    y += 4;
-
-    doc.setFont('times', 'normal');
-    evaluations.forEach(ev => {
-      if (y > 270) { doc.addPage(); y = 25; }
-      ex = ml;
-      const row = [ev.area, ev.instrument || '—', fmtDate(ev.date), String(ev.score ?? '—')];
-      row.forEach((cell, i) => {
-        const t = doc.splitTextToSize(String(cell), ecols[i] - 2);
-        doc.text(t[0], ex, y);
-        ex += ecols[i];
-      });
-      y += 5;
+  // EVALUACIONES
+  if (studentEvals.length > 0) {
+    sections.push(
+      new Paragraph({ text: "EVALUACIONES", heading: HeadingLevel.HEADING_2 }),
+      new Paragraph({ text: "" })
+    );
+    studentEvals.forEach((ev, i) => {
+      sections.push(
+        new Paragraph({ text: `${i + 1}. ${ev.area} - Puntaje: ${ev.score}/100`, bold: true }),
+        new Paragraph({ text: `Fecha: ${new Date(ev.date).toLocaleDateString('es-CL')}` }),
+        new Paragraph({ text: `Instrumento: ${ev.instrument || 'No especificado'}` }),
+        new Paragraph({ text: `Notas: ${ev.notes || 'Sin observaciones'}` }),
+        new Paragraph({ text: "" })
+      );
     });
   }
 
-  y += 4;
-  doc.line(ml, y, mr, y);
-  y += 8;
+  // INTERVENCIONES
+  if (studentInts.length > 0) {
+    sections.push(
+      new Paragraph({ text: "INTERVENCIONES", heading: HeadingLevel.HEADING_2 }),
+      new Paragraph({ text: "" })
+    );
+    studentInts.forEach((int, i) => {
+      sections.push(
+        new Paragraph({ text: `${i + 1}. ${int.area} (${int.status === 'active' ? 'Activo' : 'Completado'})`, bold: true }),
+        new Paragraph({ text: `Objetivo: ${int.goal}` }),
+        new Paragraph({ text: `Estrategias: ${int.strategies}` }),
+        new Paragraph({ text: "" })
+      );
+    });
+  }
 
-  // ─── Conclusions ─────────────────────────────────────────
-  if (y > 220) { doc.addPage(); y = 25; }
+  // REUNIONES
+  if (studentMeets.length > 0) {
+    sections.push(
+      new Paragraph({ text: "REUNIONES", heading: HeadingLevel.HEADING_2 }),
+      new Paragraph({ text: "" })
+    );
+    studentMeets.forEach((m, i) => {
+      sections.push(
+        new Paragraph({ text: `${i + 1}. ${m.type} - ${new Date(m.date).toLocaleDateString('es-CL')}`, bold: true }),
+        new Paragraph({ text: `Participantes: ${m.participants}` }),
+        new Paragraph({ text: `Temas: ${m.topics}` }),
+        new Paragraph({ text: `Acuerdos: ${m.agreements || 'Sin acuerdos'}` }),
+        new Paragraph({ text: "" })
+      );
+    });
+  }
 
-  doc.setFont('times', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(42, 26, 31);
-  doc.text('IV. CONCLUSIONES Y RECOMENDACIONES', ml, y);
-  y += 7;
+  // BITÁCORA
+  if (studentBit.length > 0) {
+    sections.push(
+      new Paragraph({ text: "BITÁCORA", heading: HeadingLevel.HEADING_2 }),
+      new Paragraph({ text: "" })
+    );
+    studentBit.forEach((b, i) => {
+      sections.push(
+        new Paragraph({ text: `${i + 1}. ${b.title} - ${b.type}`, bold: true }),
+        new Paragraph({ text: `Fecha: ${new Date(b.date).toLocaleDateString('es-CL')}` }),
+        new Paragraph({ text: b.description }),
+        new Paragraph({ text: "" })
+      );
+    });
+  }
 
-  doc.setFont('times', 'normal');
-  doc.setFontSize(10);
+  // CONCLUSIÓN
+  sections.push(
+    new Paragraph({ text: "CONCLUSIONES Y RECOMENDACIONES", heading: HeadingLevel.HEADING_2 }),
+    new Paragraph({ text: "" }),
+    new Paragraph({ text: "[Espacio para que la profesional agregue conclusiones y recomendaciones]" }),
+    new Paragraph({ text: "", spacing: { after: 400 } }),
+    new Paragraph({ text: "________________________________" }),
+    new Paragraph({ text: professional }),
+    new Paragraph({ text: institution })
+  );
 
-  const conclusions = getConclusionsByType(reportType, student);
-  conclusions.forEach(paragraph => {
-    if (y > 265) { doc.addPage(); y = 25; }
-    const lines = doc.splitTextToSize(paragraph, cw);
-    doc.text(lines, ml, y);
-    y += lines.length * 4.5 + 4;
+  const doc = new Document({ sections: [{ children: sections }] });
+  
+  Packer.toBlob(doc).then(blob => {
+    saveAs(blob, `Informe_${student.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.docx`);
+    showToast('Informe generado exitosamente.', 'success');
   });
-
-  y += 6;
-  doc.line(ml, y, mr, y);
-  y += 10;
-
-  // ─── Signature ────────────────────────────────────────────
-  if (y > 260) { doc.addPage(); y = 25; }
-  doc.setFont('times', 'normal');
-  doc.setFontSize(10);
-  doc.text('_______________________________', ml, y);
-  y += 6;
-  doc.setFont('times', 'bold');
-  doc.text(psychName, ml, y);
-  y += 5;
-  doc.setFont('times', 'normal');
-  doc.text('Psicopedagoga/o', ml, y);
-  if (institution) { y += 5; doc.text(institution, ml, y); }
-  y += 5;
-  doc.text(today, ml, y);
-
-  // ─── Page numbers ─────────────────────────────────────────
-  const total = doc.getNumberOfPages();
-  for (let i = 1; i <= total; i++) {
-    doc.setPage(i);
-    doc.setFont('times', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(150, 150, 150);
-    doc.text(`${i} / ${total}`, 105, 292, { align: 'center' });
-  }
-
-  doc.save(`informe-${student.name.replace(/\s+/g, '_')}-${reportType}.pdf`);
-  showToast('Informe APA generado.', 'success');
 }
-
-function getConclusionsByType(type, student) {
-  const name = student.name;
-  const base = [
-    `El/La estudiante ${name} ha participado en el proceso de evaluación e intervención psicopedagógica de manera activa, mostrando disposición favorable hacia las actividades propuestas.`,
-    `Los resultados obtenidos en las distintas áreas evaluadas reflejan el perfil de aprendizaje individual del/la estudiante, identificándose tanto fortalezas como áreas de mejora que requieren atención especializada.`,
-    `Se recomienda mantener un trabajo sistemático y coordinado entre el equipo de aula, la familia y el equipo de apoyo a la inclusión (PIE), con el fin de favorecer el desarrollo integral del/la estudiante y dar seguimiento a los progresos alcanzados.`,
-  ];
-
-  if (type === 'Diagnóstico') {
-    return [
-      ...base,
-      `El diagnóstico psicopedagógico tiene por finalidad orientar la planificación de estrategias de intervención adecuadas a las necesidades educativas especiales identificadas. Se sugiere revisar las adaptaciones curriculares pertinentes en coordinación con el equipo docente.`,
-      `Este informe ha sido elaborado en conformidad con las normativas vigentes del Decreto N° 83 y las orientaciones del Ministerio de Educación de Chile.`,
-    ];
-  }
-  if (type === 'Derivación') {
-    return [
-      ...base,
-      `Dado el perfil evaluado, se recomienda la derivación del/la estudiante a los especialistas pertinentes para una evaluación complementaria. La familia debe ser orientada respecto al proceso de derivación y acompañamiento externo.`,
-      `La presente derivación es de carácter preventivo y no implica diagnóstico clínico. Su objetivo es complementar la atención educativa con el apoyo interdisciplinario necesario.`,
-    ];
-  }
-  // Progreso (default)
-  return [
-    ...base,
-    `Los avances observados en el período de intervención son consistentes con el plan de trabajo establecido. Se evidencian progresos en las áreas intervenidas, aunque se requiere continuidad en el proceso para consolidar los aprendizajes adquiridos.`,
-    `Se sugiere mantener las estrategias de trabajo actuales y reforzar la comunicación entre los agentes educativos involucrados para garantizar la continuidad y coherencia del proceso de apoyo.`,
-  ];
-}
+window.generateReport = generateReport;

@@ -1,24 +1,11 @@
 {
   "name": "averix-psicoescolar",
   "version": "1.0.0",
-  "description": "Sistema de gestión psicopedagógica profesional AVERIX",
-  "main": "index.html",
-  "scripts": {
-    "start": "npx serve . -p 3000",
-    "dev": "npx live-server --port=3000 --open=/"
-  },
+  "description": "Sistema de gestión psicopedagógica",
+  "type": "module",
   "dependencies": {
-    "@supabase/supabase-js": "^2.45.0",
-    "jspdf": "^2.5.1"
-  },
-  "devDependencies": {
-    "serve": "^14.2.3",
-    "live-server": "^1.2.2"
-  },
-  "keywords": ["psicopedagogia", "educacion", "supabase"],
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": ""
+    "@supabase/supabase-js": "^2.39.0",
+    "docx": "^8.5.0",
+    "file-saver": "^2.0.5"
   }
 }
