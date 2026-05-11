@@ -60,20 +60,20 @@ async function generateReport(e) {
 
   const student = App.students.find(s => s.id === studentId);
   
-  // Obtener TODOS los datos del estudiante
-  const observations = await dbOperation('observations', 'get');
-  const evaluations = await dbOperation('evaluations', 'get');
-  const interventions = await dbOperation('interventions', 'get');
-  const meetings = await dbOperation('meetings', 'get');
-  const bitacoras = await dbOperation('bitacora', 'get');
+  // Obtener TODOS los datos del estudiante usando Supabase directamente
+  const { data: observations } = await db.from('observations').select('*').eq('student_id', studentId);
+  const { data: evaluations } = await db.from('evaluations').select('*').eq('student_id', studentId);
+  const { data: interventions } = await db.from('interventions').select('*').eq('student_id', studentId);
+  const { data: meetings } = await db.from('meetings').select('*').eq('student_id', studentId);
+  const { data: bitacoras } = await db.from('bitacora').select('*').eq('student_id', studentId);
 
-  const studentObs = observations.filter(o => o.student_id === studentId);
-  const studentEvals = evaluations.filter(e => e.student_id === studentId);
-  const studentInts = interventions.filter(i => i.student_id === studentId);
-  const studentMeets = meetings.filter(m => m.student_id === studentId);
-  const studentBit = bitacoras.filter(b => b.student_id === studentId);
+  const studentObs = observations || [];
+  const studentEvals = evaluations || [];
+  const studentInts = interventions || [];
+  const studentMeets = meetings || [];
+  const studentBit = bitacoras || [];
 
-  const { Document, Packer, Paragraph, HeadingLevel, AlignmentType, TextRun, TabStopType, TabStopPosition } = docx;
+  const { Document, Packer, Paragraph, HeadingLevel, AlignmentType } = docx;
 
   const sections = [];
 

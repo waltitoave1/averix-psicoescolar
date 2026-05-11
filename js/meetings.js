@@ -54,7 +54,7 @@ function renderMeetings() {
     <div class="toolbar">
       <div class="spacer"></div>
       <button class="btn btn-primary" onclick="showMeetForm(null)">+ Nueva Reunión</button>
-      <button class="btn btn-ghost" onclick="pdfMeetings()">📄 Word</button>
+      <button class="btn btn-ghost" onclick="downloadMeetingsList()">📄 Word</button>
     </div>
     <div class="items-list">${itemsHTML}</div>
   `;
