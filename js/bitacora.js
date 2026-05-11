@@ -78,7 +78,7 @@ function renderBitacora() {
       <input class="filter-select" type="month" value="${bitMonthFilter}" onchange="setBitMonthFilter(this.value)" style="min-width:160px" />
       <div class="spacer"></div>
       <button class="btn btn-primary" onclick="showBitForm(null)">+ Nueva Entrada</button>
-      <button class="btn btn-ghost" onclick="pdfBitacora()">📄 PDF</button>
+      <button class="btn btn-ghost" onclick="pdfBitacora()">📄 Word</button>
     </div>
     <div>${itemsHTML}</div>
   `;

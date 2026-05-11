@@ -63,7 +63,7 @@ function renderInterventions() {
       <select class="filter-select" onchange="setIntFilter(this.value)">${studentFilterOpts}</select>
       <div class="spacer"></div>
       <button class="btn btn-primary" onclick="showIntForm(null)">+ Nueva Intervención</button>
-      <button class="btn btn-ghost" onclick="pdfInterventions()">📄 PDF</button>
+      <button class="btn btn-ghost" onclick="pdfInterventions()">📄 Word</button>
     </div>
     <div class="items-list">${itemsHTML}</div>
   `;

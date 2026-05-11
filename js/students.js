@@ -52,7 +52,7 @@ function renderStudents(data) {
       <input id="students-search" class="search-input" type="text" placeholder="Buscar por nombre o curso..." oninput="filterStudents()" value="${escHtml(searchVal)}" />
       <div class="spacer"></div>
       <button class="btn btn-primary" onclick="showStudentForm(null)">+ Agregar Estudiante</button>
-      <button class="btn btn-ghost" onclick="pdfStudents()">📄 PDF</button>
+      <button class="btn btn-ghost" onclick="pdfStudents()">📄 Word</button>
     </div>
     <div class="cards-grid">${cardsHTML}</div>
   `;
