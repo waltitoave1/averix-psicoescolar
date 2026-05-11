@@ -769,3 +769,13 @@ body {
   .stat-grid { grid-template-columns: 1fr 1fr; }
   .form-row { grid-template-columns: 1fr; }
 }
+
+/* Logo de Avellana */
+.sidebar-logo {
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
