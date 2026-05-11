@@ -238,7 +238,7 @@ window.pdfStudents = pdfStudents;
 
 // Descargar lista de estudiantes en WORD
 async function downloadStudentsList() {
-  const students = await dbOperation('students', 'get');
+  const { data: students } = await db.from('students').select('*');
   if (students.length === 0) {
     showToast('No hay estudiantes para descargar.', 'error');
     return;

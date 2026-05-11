@@ -236,8 +236,8 @@ window.pdfInterventions = pdfInterventions;
 
 // Descargar intervenciones en WORD
 async function downloadInterventionsList() {
-  const interventions = await dbOperation('interventions', 'get');
-  const students = await dbOperation('students', 'get');
+  const { data: interventions } = await db.from('interventions').select('*');
+  const { data: students } = await db.from('students').select('*');
   if (interventions.length === 0) {
     showToast('No hay intervenciones.', 'error');
     return;

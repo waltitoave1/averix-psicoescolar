@@ -265,8 +265,8 @@ window.pdfBitacora = pdfBitacora;
 
 // Descargar bitácora en WORD
 async function downloadBitacora() {
-  const bitacoras = await dbOperation('bitacora', 'get');
-  const students = await dbOperation('students', 'get');
+  const { data: bitacoras } = await db.from('bitacora').select('*');
+  const { data: students } = await db.from('students').select('*')('students', 'get');
   
   const filterStudent = document.getElementById('filter-bitacora-student');
   const monthFilter = document.getElementById('filter-bitacora-month');

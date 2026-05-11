@@ -223,8 +223,8 @@ window.pdfMeetings = pdfMeetings;
 
 // Descargar reuniones en WORD
 async function downloadMeetingsList() {
-  const meetings = await dbOperation('meetings', 'get');
-  const students = await dbOperation('students', 'get');
+  const { data: meetings } = await db.from('meetings').select('*');
+  const { data: students } = await db.from('students').select('*')('students', 'get');
   if (meetings.length === 0) {
     showToast('No hay reuniones.', 'error');
     return;
