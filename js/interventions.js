@@ -276,3 +276,30 @@ async function downloadInterventionsList() {
   });
 }
 window.downloadInterventionsList = downloadInterventionsList;
+
+async function downloadInterventionsList() {
+  const { data: interventions } = await db.from('interventions').select('*');
+  const { data: students } = await db.from('students').select('*');
+  if (!interventions || interventions.length === 0) {
+    showToast('No hay intervenciones.', 'error');
+    return;
+  }
+  const { Document, Packer, Paragraph, HeadingLevel } = docx;
+  const sections = [new Paragraph({ text: "INTERVENCIONES", heading: HeadingLevel.HEADING_1 }), new Paragraph({ text: "" })];
+  interventions.forEach((int, i) => {
+    const student = students?.find(s => s.id === int.student_id);
+    sections.push(
+      new Paragraph({ text: `${i + 1}. ${student?.name || ''}`, heading: HeadingLevel.HEADING_2 }),
+      new Paragraph({ text: `Área: ${int.area}` }),
+      new Paragraph({ text: `Objetivo: ${int.goal}` }),
+      new Paragraph({ text: `Estrategias: ${int.strategies}` }),
+      new Paragraph({ text: "" })
+    );
+  });
+  const doc = new Document({ sections: [{ children: sections }] });
+  Packer.toBlob(doc).then(blob => {
+    saveAs(blob, `Intervenciones_${new Date().toISOString().split('T')[0]}.docx`);
+    showToast('Descargado.', 'success');
+  });
+}
+window.downloadInterventionsList = downloadInterventionsList;

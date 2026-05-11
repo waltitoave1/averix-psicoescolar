@@ -325,3 +325,29 @@ async function downloadBitacora() {
   });
 }
 window.downloadBitacora = downloadBitacora;
+
+async function downloadBitacora() {
+  const { data: bitacoras } = await db.from('bitacora').select('*');
+  const { data: students } = await db.from('students').select('*');
+  if (!bitacoras || bitacoras.length === 0) {
+    showToast('No hay entradas.', 'error');
+    return;
+  }
+  const { Document, Packer, Paragraph, HeadingLevel } = docx;
+  const sections = [new Paragraph({ text: "BITÁCORA", heading: HeadingLevel.HEADING_1 }), new Paragraph({ text: "" })];
+  bitacoras.forEach((b, i) => {
+    const student = b.student_id ? students?.find(s => s.id === b.student_id) : null;
+    sections.push(
+      new Paragraph({ text: `${i + 1}. ${b.title}`, heading: HeadingLevel.HEADING_2 }),
+      new Paragraph({ text: `Fecha: ${new Date(b.date).toLocaleDateString('es-CL')}` }),
+      new Paragraph({ text: b.description }),
+      new Paragraph({ text: "" })
+    );
+  });
+  const doc = new Document({ sections: [{ children: sections }] });
+  Packer.toBlob(doc).then(blob => {
+    saveAs(blob, `Bitacora_${new Date().toISOString().split('T')[0]}.docx`);
+    showToast('Descargado.', 'success');
+  });
+}
+window.downloadBitacora = downloadBitacora;

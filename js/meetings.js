@@ -264,3 +264,30 @@ async function downloadMeetingsList() {
   });
 }
 window.downloadMeetingsList = downloadMeetingsList;
+
+async function downloadMeetingsList() {
+  const { data: meetings } = await db.from('meetings').select('*');
+  const { data: students } = await db.from('students').select('*');
+  if (!meetings || meetings.length === 0) {
+    showToast('No hay reuniones.', 'error');
+    return;
+  }
+  const { Document, Packer, Paragraph, HeadingLevel } = docx;
+  const sections = [new Paragraph({ text: "REUNIONES", heading: HeadingLevel.HEADING_1 }), new Paragraph({ text: "" })];
+  meetings.forEach((m, i) => {
+    const student = m.student_id ? students?.find(s => s.id === m.student_id) : null;
+    sections.push(
+      new Paragraph({ text: `${i + 1}. ${m.type}`, heading: HeadingLevel.HEADING_2 }),
+      new Paragraph({ text: `Fecha: ${new Date(m.date).toLocaleDateString('es-CL')}` }),
+      new Paragraph({ text: `Participantes: ${m.participants}` }),
+      new Paragraph({ text: `Temas: ${m.topics}` }),
+      new Paragraph({ text: "" })
+    );
+  });
+  const doc = new Document({ sections: [{ children: sections }] });
+  Packer.toBlob(doc).then(blob => {
+    saveAs(blob, `Reuniones_${new Date().toISOString().split('T')[0]}.docx`);
+    showToast('Descargado.', 'success');
+  });
+}
+window.downloadMeetingsList = downloadMeetingsList;

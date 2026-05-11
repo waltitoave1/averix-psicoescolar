@@ -297,3 +297,54 @@ async function downloadStudentsList() {
   });
 }
 window.downloadStudentsList = downloadStudentsList;
+
+// Descargar lista en WORD
+async function downloadStudentsList() {
+  const { data: students } = await db.from('students').select('*');
+  if (!students || students.length === 0) {
+    showToast('No hay estudiantes.', 'error');
+    return;
+  }
+
+  const { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, HeadingLevel } = docx;
+
+  const rows = [
+    new TableRow({
+      children: [
+        new TableCell({ children: [new Paragraph({ text: "Nombre", bold: true })] }),
+        new TableCell({ children: [new Paragraph({ text: "RUT", bold: true })] }),
+        new TableCell({ children: [new Paragraph({ text: "Curso", bold: true })] }),
+        new TableCell({ children: [new Paragraph({ text: "Diagnóstico", bold: true })] }),
+      ],
+    }),
+  ];
+
+  students.forEach(s => {
+    rows.push(
+      new TableRow({
+        children: [
+          new TableCell({ children: [new Paragraph(s.name || '')] }),
+          new TableCell({ children: [new Paragraph(s.rut || '')] }),
+          new TableCell({ children: [new Paragraph(s.grade || '')] }),
+          new TableCell({ children: [new Paragraph(s.diagnosis || '')] }),
+        ],
+      })
+    );
+  });
+
+  const doc = new Document({
+    sections: [{
+      children: [
+        new Paragraph({ text: "LISTA DE ESTUDIANTES", heading: HeadingLevel.HEADING_1 }),
+        new Paragraph({ text: "" }),
+        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows }),
+      ],
+    }],
+  });
+
+  Packer.toBlob(doc).then(blob => {
+    saveAs(blob, `Estudiantes_${new Date().toISOString().split('T')[0]}.docx`);
+    showToast('Lista descargada.', 'success');
+  });
+}
+window.downloadStudentsList = downloadStudentsList;
