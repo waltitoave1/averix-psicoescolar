@@ -148,146 +148,44 @@ async function deleteMeet(id) {
 }
 window.deleteMeet = deleteMeet;
 
-// PDF
-async function pdfMeetings() {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const { data } = await db.from('meetings')
-    .select('*, students(name)')
-    .order('date', { ascending: false });
-  const items = data || [];
-
-  const ml = 20, mr = 190;
-  let y = 20;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.setTextColor(233, 27, 126);
-  doc.text('AVERIX PsicoEscolar', 105, y, { align: 'center' });
-  y += 8;
-  doc.setFontSize(12);
-  doc.setTextColor(42, 26, 31);
-  doc.text('Registro de Reuniones', 105, y, { align: 'center' });
-  y += 8;
-  doc.setDrawColor(233, 27, 126);
-  doc.line(ml, y, mr, y);
-  y += 8;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-
-  items.forEach((m, idx) => {
-    if (y > 248) { doc.addPage(); y = 20; }
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(233, 27, 126);
-    doc.text(`${idx + 1}. ${m.type}`, ml, y);
-    y += 5;
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(42, 26, 31);
-    doc.text(`Fecha: ${fmtDate(m.date)}${m.students ? ' | Estudiante: ' + m.students.name : ''}`, ml, y);
-    y += 5;
-    doc.text(`Participantes: ${m.participants}`, ml, y);
-    y += 5;
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('Temas:', ml, y);
-    doc.setFont('helvetica', 'normal');
-    y += 4;
-    const topicLines = doc.splitTextToSize(m.topics || '', 170);
-    doc.text(topicLines, ml, y);
-    y += topicLines.length * 4 + 2;
-
-    if (m.agreements) {
-      doc.setFont('helvetica', 'bold');
-      doc.text('Acuerdos:', ml, y);
-      doc.setFont('helvetica', 'normal');
-      y += 4;
-      const agreemLines = doc.splitTextToSize(m.agreements, 170);
-      doc.text(agreemLines, ml, y);
-      y += agreemLines.length * 4 + 2;
-    }
-
-    doc.setDrawColor(220, 220, 220);
-    doc.line(ml, y + 2, mr, y + 2);
-    y += 8;
-  });
-
-  doc.save('reuniones.pdf');
-  showToast('PDF generado.', 'success');
-}
-window.pdfMeetings = pdfMeetings;
-
-// Descargar reuniones en WORD
 async function downloadMeetingsList() {
-  const { data: meetings } = await db.from('meetings').select('*');
-  const { data: students } = await db.from('students').select('*')('students', 'get');
-  if (meetings.length === 0) {
-    showToast('No hay reuniones.', 'error');
+  const { data: meetings, error } = await db.from('meetings').select('*').order('date', { ascending: false });
+  const { data: students } = await db.from('students').select('id, name');
+  if (error || !meetings || meetings.length === 0) {
+    showToast('No hay reuniones para descargar.', 'error');
     return;
   }
 
-  const { Document, Packer, Paragraph, HeadingLevel, AlignmentType } = docx;
-  
-  const sections = [
-    new Paragraph({ text: "REGISTRO DE REUNIONES", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
+  const { Document, Packer, Paragraph, HeadingLevel, AlignmentType, TextRun } = docx;
+
+  const content = [
+    new Paragraph({ text: 'REGISTRO DE REUNIONES', heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
     new Paragraph({ text: `Generado: ${new Date().toLocaleDateString('es-CL')}`, alignment: AlignmentType.CENTER }),
-    new Paragraph({ text: "" }),
+    new Paragraph({ text: '' }),
   ];
 
-  meetings.forEach((m, index) => {
-    const student = m.student_id ? students.find(s => s.id === m.student_id) : null;
-    sections.push(
-      new Paragraph({ text: `${index + 1}. ${m.type}`, heading: HeadingLevel.HEADING_2 }),
-      new Paragraph({ text: `Fecha: ${new Date(m.date).toLocaleDateString('es-CL')}` }),
-      new Paragraph({ text: `Estudiante: ${student?.name || 'Reunión general'}` }),
-      new Paragraph({ text: `Participantes: ${m.participants}` }),
-      new Paragraph({ text: "" }),
-      new Paragraph({ text: "Temas tratados:", bold: true }),
-      new Paragraph({ text: m.topics }),
-      new Paragraph({ text: "" }),
-      new Paragraph({ text: "Acuerdos:", bold: true }),
-      new Paragraph({ text: m.agreements || 'Sin acuerdos registrados' }),
-      new Paragraph({ text: "" }),
-      new Paragraph({ text: "—".repeat(50) }),
-      new Paragraph({ text: "" })
-    );
-  });
-
-  const doc = new Document({ sections: [{ children: sections }] });
-  Packer.toBlob(doc).then(blob => {
-    saveAs(blob, `Reuniones_${new Date().toISOString().split('T')[0]}.docx`);
-    showToast('Reuniones descargadas.', 'success');
-  });
-}
-window.downloadMeetingsList = downloadMeetingsList;
-
-async function downloadMeetingsList() {
-  const { data: meetings } = await db.from('meetings').select('*');
-  const { data: students } = await db.from('students').select('*');
-  if (!meetings || meetings.length === 0) {
-    showToast('No hay reuniones.', 'error');
-    return;
-  }
-  const { Document, Packer, Paragraph, HeadingLevel } = docx;
-  const sections = [new Paragraph({ text: "REUNIONES", heading: HeadingLevel.HEADING_1 }), new Paragraph({ text: "" })];
   meetings.forEach((m, i) => {
     const student = m.student_id ? students?.find(s => s.id === m.student_id) : null;
-    sections.push(
+    content.push(
       new Paragraph({ text: `${i + 1}. ${m.type}`, heading: HeadingLevel.HEADING_2 }),
-      new Paragraph({ text: `Fecha: ${new Date(m.date).toLocaleDateString('es-CL')}` }),
-      new Paragraph({ text: `Participantes: ${m.participants}` }),
-      new Paragraph({ text: `Temas: ${m.topics}` }),
-      new Paragraph({ text: "" })
+      new Paragraph({ text: `Fecha: ${m.date ? new Date(m.date).toLocaleDateString('es-CL') : ''}` }),
+      new Paragraph({ text: `Estudiante: ${student?.name || 'Reunión general'}` }),
+      new Paragraph({ text: `Participantes: ${m.participants || ''}` }),
+      new Paragraph({ text: '' }),
+      new Paragraph({ children: [new TextRun({ text: 'Temas tratados:', bold: true })] }),
+      new Paragraph({ text: m.topics || '' }),
+      new Paragraph({ text: '' }),
+      new Paragraph({ children: [new TextRun({ text: 'Acuerdos:', bold: true })] }),
+      new Paragraph({ text: m.agreements || 'Sin acuerdos registrados' }),
+      new Paragraph({ text: '─'.repeat(40) }),
+      new Paragraph({ text: '' }),
     );
   });
-  const doc = new Document({ sections: [{ children: sections }] });
-  Packer.toBlob(doc).then(blob => {
+
+  const document = new Document({ sections: [{ children: content }] });
+  Packer.toBlob(document).then(blob => {
     saveAs(blob, `Reuniones_${new Date().toISOString().split('T')[0]}.docx`);
-    showToast('Descargado.', 'success');
-  });
+    showToast('Reuniones descargadas en Word.', 'success');
+  }).catch(() => showToast('Error al generar el archivo Word.', 'error'));
 }
 window.downloadMeetingsList = downloadMeetingsList;

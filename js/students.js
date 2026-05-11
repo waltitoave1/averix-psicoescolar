@@ -176,175 +176,49 @@ async function deleteStudent(id) {
 }
 window.deleteStudent = deleteStudent;
 
-// PDF: Lista de estudiantes
-async function pdfStudents() {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const { data } = await db.from('students').select('*').order('name');
-  const students = data || [];
-
-  const ml = 20, mr = 190, cw = 170;
-  let y = 20;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.setTextColor(233, 27, 126);
-  doc.text('AVERIX PsicoEscolar', 105, y, { align: 'center' });
-  y += 8;
-  doc.setFontSize(12);
-  doc.setTextColor(42, 26, 31);
-  doc.text('Listado de Estudiantes', 105, y, { align: 'center' });
-  y += 6;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(107, 78, 90);
-  doc.text(`Generado: ${new Date().toLocaleDateString('es-CL')}`, 105, y, { align: 'center' });
-  y += 8;
-  doc.setDrawColor(233, 27, 126);
-  doc.line(ml, y, mr, y);
-  y += 8;
-
-  // Table header
-  const cols = [55, 35, 35, 45];
-  const headers = ['Nombre', 'RUT', 'Curso', 'Diagnóstico'];
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(42, 26, 31);
-  let x = ml;
-  headers.forEach((h, i) => { doc.text(h, x, y); x += cols[i]; });
-  y += 5;
-  doc.setDrawColor(200, 200, 200);
-  doc.line(ml, y, mr, y);
-  y += 5;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  students.forEach(s => {
-    if (y > 270) { doc.addPage(); y = 20; }
-    x = ml;
-    const row = [s.name, s.rut || '—', s.grade || '—', s.diagnosis || '—'];
-    row.forEach((cell, i) => {
-      const lines = doc.splitTextToSize(String(cell), cols[i] - 2);
-      doc.text(lines[0], x, y);
-      x += cols[i];
-    });
-    y += 7;
-  });
-
-  doc.save('estudiantes.pdf');
-  showToast('PDF generado.', 'success');
-}
-window.pdfStudents = pdfStudents;
-
-// Descargar lista de estudiantes en WORD
 async function downloadStudentsList() {
-  const { data: students } = await db.from('students').select('*');
-  if (students.length === 0) {
+  const { data: students, error } = await db.from('students').select('*').order('name');
+  if (error || !students || students.length === 0) {
     showToast('No hay estudiantes para descargar.', 'error');
     return;
   }
 
-  const { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, AlignmentType, TextRun, HeadingLevel } = docx;
+  const { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, HeadingLevel, AlignmentType, TextRun } = docx;
 
-  const tableRows = [
-    new TableRow({
-      children: [
-        new TableCell({ children: [new Paragraph({ text: "Nombre", bold: true })] }),
-        new TableCell({ children: [new Paragraph({ text: "RUT", bold: true })] }),
-        new TableCell({ children: [new Paragraph({ text: "Curso", bold: true })] }),
-        new TableCell({ children: [new Paragraph({ text: "Diagnóstico", bold: true })] }),
-      ],
-    }),
-  ];
-
-  students.forEach(s => {
-    tableRows.push(
-      new TableRow({
-        children: [
-          new TableCell({ children: [new Paragraph(s.name || '')] }),
-          new TableCell({ children: [new Paragraph(s.rut || '')] }),
-          new TableCell({ children: [new Paragraph(s.grade || '')] }),
-          new TableCell({ children: [new Paragraph(s.diagnosis || '')] }),
-        ],
-      })
-    );
+  const headerRow = new TableRow({
+    children: [
+      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Nombre', bold: true })] })] }),
+      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'RUT', bold: true })] })] }),
+      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Curso', bold: true })] })] }),
+      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Diagnóstico', bold: true })] })] }),
+      new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: 'Notas', bold: true })] })] }),
+    ],
   });
 
-  const doc = new Document({
+  const dataRows = students.map(s => new TableRow({
+    children: [
+      new TableCell({ children: [new Paragraph({ text: s.name || '' })] }),
+      new TableCell({ children: [new Paragraph({ text: s.rut || '' })] }),
+      new TableCell({ children: [new Paragraph({ text: s.grade || '' })] }),
+      new TableCell({ children: [new Paragraph({ text: s.diagnosis || '' })] }),
+      new TableCell({ children: [new Paragraph({ text: s.notes || '' })] }),
+    ],
+  }));
+
+  const document = new Document({
     sections: [{
       children: [
-        new Paragraph({
-          text: "LISTA DE ESTUDIANTES",
-          heading: HeadingLevel.HEADING_1,
-          alignment: AlignmentType.CENTER,
-        }),
-        new Paragraph({
-          text: `Generado: ${new Date().toLocaleDateString('es-CL')}`,
-          alignment: AlignmentType.CENTER,
-        }),
-        new Paragraph({ text: "" }),
-        new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          rows: tableRows,
-        }),
+        new Paragraph({ text: 'LISTA DE ESTUDIANTES', heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
+        new Paragraph({ text: `Generado: ${new Date().toLocaleDateString('es-CL')}`, alignment: AlignmentType.CENTER }),
+        new Paragraph({ text: '' }),
+        new Table({ width: { size: 100, type: WidthType.PCT }, rows: [headerRow, ...dataRows] }),
       ],
     }],
   });
 
-  Packer.toBlob(doc).then(blob => {
-    saveAs(blob, `Lista_Estudiantes_${new Date().toISOString().split('T')[0]}.docx`);
-    showToast('Lista descargada en Word.', 'success');
-  });
-}
-window.downloadStudentsList = downloadStudentsList;
-
-// Descargar lista en WORD
-async function downloadStudentsList() {
-  const { data: students } = await db.from('students').select('*');
-  if (!students || students.length === 0) {
-    showToast('No hay estudiantes.', 'error');
-    return;
-  }
-
-  const { Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, HeadingLevel } = docx;
-
-  const rows = [
-    new TableRow({
-      children: [
-        new TableCell({ children: [new Paragraph({ text: "Nombre", bold: true })] }),
-        new TableCell({ children: [new Paragraph({ text: "RUT", bold: true })] }),
-        new TableCell({ children: [new Paragraph({ text: "Curso", bold: true })] }),
-        new TableCell({ children: [new Paragraph({ text: "Diagnóstico", bold: true })] }),
-      ],
-    }),
-  ];
-
-  students.forEach(s => {
-    rows.push(
-      new TableRow({
-        children: [
-          new TableCell({ children: [new Paragraph(s.name || '')] }),
-          new TableCell({ children: [new Paragraph(s.rut || '')] }),
-          new TableCell({ children: [new Paragraph(s.grade || '')] }),
-          new TableCell({ children: [new Paragraph(s.diagnosis || '')] }),
-        ],
-      })
-    );
-  });
-
-  const doc = new Document({
-    sections: [{
-      children: [
-        new Paragraph({ text: "LISTA DE ESTUDIANTES", heading: HeadingLevel.HEADING_1 }),
-        new Paragraph({ text: "" }),
-        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows }),
-      ],
-    }],
-  });
-
-  Packer.toBlob(doc).then(blob => {
+  Packer.toBlob(document).then(blob => {
     saveAs(blob, `Estudiantes_${new Date().toISOString().split('T')[0]}.docx`);
-    showToast('Lista descargada.', 'success');
-  });
+    showToast('Lista descargada en Word.', 'success');
+  }).catch(() => showToast('Error al generar el archivo Word.', 'error'));
 }
 window.downloadStudentsList = downloadStudentsList;

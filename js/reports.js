@@ -73,7 +73,7 @@ async function generateReport(e) {
   const studentMeets = meetings || [];
   const studentBit = bitacoras || [];
 
-  const { Document, Packer, Paragraph, HeadingLevel, AlignmentType } = docx;
+  const { Document, Packer, Paragraph, HeadingLevel, AlignmentType, TextRun } = docx;
 
   const sections = [];
 
@@ -99,8 +99,8 @@ async function generateReport(e) {
     );
     studentObs.forEach((obs, i) => {
       sections.push(
-        new Paragraph({ text: `${i + 1}. Fecha: ${new Date(obs.date).toLocaleDateString('es-CL')} - ${obs.area || 'General'}`, bold: true }),
-        new Paragraph({ text: obs.text }),
+        new Paragraph({ children: [new TextRun({ text: `${i + 1}. Fecha: ${new Date(obs.date).toLocaleDateString('es-CL')} - ${obs.area || 'General'}`, bold: true })] }),
+        new Paragraph({ text: obs.text || '' }),
         new Paragraph({ text: "" })
       );
     });
@@ -114,7 +114,7 @@ async function generateReport(e) {
     );
     studentEvals.forEach((ev, i) => {
       sections.push(
-        new Paragraph({ text: `${i + 1}. ${ev.area} - Puntaje: ${ev.score}/100`, bold: true }),
+        new Paragraph({ children: [new TextRun({ text: `${i + 1}. ${ev.area} - Puntaje: ${ev.score}/100`, bold: true })] }),
         new Paragraph({ text: `Fecha: ${new Date(ev.date).toLocaleDateString('es-CL')}` }),
         new Paragraph({ text: `Instrumento: ${ev.instrument || 'No especificado'}` }),
         new Paragraph({ text: `Notas: ${ev.notes || 'Sin observaciones'}` }),
@@ -131,9 +131,9 @@ async function generateReport(e) {
     );
     studentInts.forEach((int, i) => {
       sections.push(
-        new Paragraph({ text: `${i + 1}. ${int.area} (${int.status === 'active' ? 'Activo' : 'Completado'})`, bold: true }),
-        new Paragraph({ text: `Objetivo: ${int.goal}` }),
-        new Paragraph({ text: `Estrategias: ${int.strategies}` }),
+        new Paragraph({ children: [new TextRun({ text: `${i + 1}. ${int.area} (${int.status === 'active' ? 'Activo' : 'Completado'})`, bold: true })] }),
+        new Paragraph({ text: `Objetivo: ${int.goal || ''}` }),
+        new Paragraph({ text: `Estrategias: ${int.strategies || ''}` }),
         new Paragraph({ text: "" })
       );
     });
@@ -147,9 +147,9 @@ async function generateReport(e) {
     );
     studentMeets.forEach((m, i) => {
       sections.push(
-        new Paragraph({ text: `${i + 1}. ${m.type} - ${new Date(m.date).toLocaleDateString('es-CL')}`, bold: true }),
-        new Paragraph({ text: `Participantes: ${m.participants}` }),
-        new Paragraph({ text: `Temas: ${m.topics}` }),
+        new Paragraph({ children: [new TextRun({ text: `${i + 1}. ${m.type} - ${new Date(m.date).toLocaleDateString('es-CL')}`, bold: true })] }),
+        new Paragraph({ text: `Participantes: ${m.participants || ''}` }),
+        new Paragraph({ text: `Temas: ${m.topics || ''}` }),
         new Paragraph({ text: `Acuerdos: ${m.agreements || 'Sin acuerdos'}` }),
         new Paragraph({ text: "" })
       );
@@ -164,9 +164,9 @@ async function generateReport(e) {
     );
     studentBit.forEach((b, i) => {
       sections.push(
-        new Paragraph({ text: `${i + 1}. ${b.title} - ${b.type}`, bold: true }),
+        new Paragraph({ children: [new TextRun({ text: `${i + 1}. ${b.title} - ${b.type}`, bold: true })] }),
         new Paragraph({ text: `Fecha: ${new Date(b.date).toLocaleDateString('es-CL')}` }),
-        new Paragraph({ text: b.description }),
+        new Paragraph({ text: b.description || '' }),
         new Paragraph({ text: "" })
       );
     });
@@ -188,6 +188,6 @@ async function generateReport(e) {
   Packer.toBlob(doc).then(blob => {
     saveAs(blob, `Informe_${student.name.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.docx`);
     showToast('Informe generado exitosamente.', 'success');
-  });
+  }).catch(() => showToast('Error al generar el informe Word.', 'error'));
 }
 window.generateReport = generateReport;

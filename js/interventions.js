@@ -164,142 +164,45 @@ async function deleteInt(id) {
 }
 window.deleteInt = deleteInt;
 
-// PDF
-async function pdfInterventions() {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const { data } = await db.from('interventions')
-    .select('*, students(name, grade)')
-    .order('start_date', { ascending: false });
-  const items = data || [];
-
-  const ml = 20, mr = 190;
-  let y = 20;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.setTextColor(233, 27, 126);
-  doc.text('AVERIX PsicoEscolar', 105, y, { align: 'center' });
-  y += 8;
-  doc.setFontSize(12);
-  doc.setTextColor(42, 26, 31);
-  doc.text('Plan de Intervenciones', 105, y, { align: 'center' });
-  y += 8;
-  doc.setDrawColor(233, 27, 126);
-  doc.line(ml, y, mr, y);
-  y += 8;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-
-  items.forEach((int, idx) => {
-    if (y > 250) { doc.addPage(); y = 20; }
-    const status = int.status === 'active' ? 'Activo' : 'Completado';
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(233, 27, 126);
-    doc.text(`${idx + 1}. ${int.students?.name || '—'}`, ml, y);
-    y += 5;
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(42, 26, 31);
-    doc.text(`Área: ${int.area}  |  Inicio: ${fmtDate(int.start_date)}  |  Estado: ${status}`, ml, y);
-    y += 5;
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('Objetivo:', ml, y);
-    doc.setFont('helvetica', 'normal');
-    y += 4;
-    const goalLines = doc.splitTextToSize(int.goal || '', 170);
-    doc.text(goalLines, ml, y);
-    y += goalLines.length * 4 + 2;
-
-    doc.setFont('helvetica', 'bold');
-    doc.text('Estrategias:', ml, y);
-    doc.setFont('helvetica', 'normal');
-    y += 4;
-    const stratLines = doc.splitTextToSize(int.strategies || '', 170);
-    doc.text(stratLines, ml, y);
-    y += stratLines.length * 4 + 6;
-
-    doc.setDrawColor(220, 220, 220);
-    doc.line(ml, y, mr, y);
-    y += 6;
-  });
-
-  doc.save('intervenciones.pdf');
-  showToast('PDF generado.', 'success');
-}
-window.pdfInterventions = pdfInterventions;
-
-// Descargar intervenciones en WORD
 async function downloadInterventionsList() {
-  const { data: interventions } = await db.from('interventions').select('*');
-  const { data: students } = await db.from('students').select('*');
-  if (interventions.length === 0) {
-    showToast('No hay intervenciones.', 'error');
+  const { data: interventions, error } = await db.from('interventions').select('*').order('start_date', { ascending: false });
+  const { data: students } = await db.from('students').select('id, name');
+  if (error || !interventions || interventions.length === 0) {
+    showToast('No hay intervenciones para descargar.', 'error');
     return;
   }
 
   const { Document, Packer, Paragraph, HeadingLevel, AlignmentType, TextRun } = docx;
-  
-  const sections = [
-    new Paragraph({ text: "PLANES DE INTERVENCIÓN", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
+
+  const content = [
+    new Paragraph({ text: 'PLANES DE INTERVENCIÓN', heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
     new Paragraph({ text: `Generado: ${new Date().toLocaleDateString('es-CL')}`, alignment: AlignmentType.CENTER }),
-    new Paragraph({ text: "" }),
+    new Paragraph({ text: '' }),
   ];
 
-  interventions.forEach((int, index) => {
-    const student = students.find(s => s.id === int.student_id);
-    sections.push(
-      new Paragraph({ text: `${index + 1}. ${student?.name || ''}`, heading: HeadingLevel.HEADING_2 }),
-      new Paragraph({ text: `Área: ${int.area}` }),
-      new Paragraph({ text: `Estado: ${int.status === 'active' ? 'Activo' : 'Completado'}` }),
-      new Paragraph({ text: "" }),
-      new Paragraph({ text: "Objetivo SMART:", bold: true }),
-      new Paragraph({ text: int.goal }),
-      new Paragraph({ text: "" }),
-      new Paragraph({ text: "Estrategias:", bold: true }),
-      new Paragraph({ text: int.strategies }),
-      new Paragraph({ text: "" }),
-      new Paragraph({ text: "—".repeat(50) }),
-      new Paragraph({ text: "" })
-    );
-  });
-
-  const doc = new Document({ sections: [{ children: sections }] });
-  Packer.toBlob(doc).then(blob => {
-    saveAs(blob, `Intervenciones_${new Date().toISOString().split('T')[0]}.docx`);
-    showToast('Intervenciones descargadas.', 'success');
-  });
-}
-window.downloadInterventionsList = downloadInterventionsList;
-
-async function downloadInterventionsList() {
-  const { data: interventions } = await db.from('interventions').select('*');
-  const { data: students } = await db.from('students').select('*');
-  if (!interventions || interventions.length === 0) {
-    showToast('No hay intervenciones.', 'error');
-    return;
-  }
-  const { Document, Packer, Paragraph, HeadingLevel } = docx;
-  const sections = [new Paragraph({ text: "INTERVENCIONES", heading: HeadingLevel.HEADING_1 }), new Paragraph({ text: "" })];
   interventions.forEach((int, i) => {
     const student = students?.find(s => s.id === int.student_id);
-    sections.push(
-      new Paragraph({ text: `${i + 1}. ${student?.name || ''}`, heading: HeadingLevel.HEADING_2 }),
-      new Paragraph({ text: `Área: ${int.area}` }),
-      new Paragraph({ text: `Objetivo: ${int.goal}` }),
-      new Paragraph({ text: `Estrategias: ${int.strategies}` }),
-      new Paragraph({ text: "" })
+    const status = int.status === 'active' ? 'Activo' : 'Completado';
+    content.push(
+      new Paragraph({ text: `${i + 1}. ${student?.name || 'Sin estudiante'}`, heading: HeadingLevel.HEADING_2 }),
+      new Paragraph({ text: `Área: ${int.area || ''}` }),
+      new Paragraph({ text: `Estado: ${status}` }),
+      new Paragraph({ text: `Fecha de inicio: ${int.start_date ? new Date(int.start_date).toLocaleDateString('es-CL') : ''}` }),
+      new Paragraph({ text: '' }),
+      new Paragraph({ children: [new TextRun({ text: 'Objetivo SMART:', bold: true })] }),
+      new Paragraph({ text: int.goal || '' }),
+      new Paragraph({ text: '' }),
+      new Paragraph({ children: [new TextRun({ text: 'Estrategias:', bold: true })] }),
+      new Paragraph({ text: int.strategies || '' }),
+      new Paragraph({ text: '─'.repeat(40) }),
+      new Paragraph({ text: '' }),
     );
   });
-  const doc = new Document({ sections: [{ children: sections }] });
-  Packer.toBlob(doc).then(blob => {
+
+  const document = new Document({ sections: [{ children: content }] });
+  Packer.toBlob(document).then(blob => {
     saveAs(blob, `Intervenciones_${new Date().toISOString().split('T')[0]}.docx`);
-    showToast('Descargado.', 'success');
-  });
+    showToast('Intervenciones descargadas en Word.', 'success');
+  }).catch(() => showToast('Error al generar el archivo Word.', 'error'));
 }
 window.downloadInterventionsList = downloadInterventionsList;

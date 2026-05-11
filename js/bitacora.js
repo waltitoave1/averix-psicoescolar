@@ -182,172 +182,52 @@ async function deleteBit(id) {
 }
 window.deleteBit = deleteBit;
 
-// PDF respetando los filtros actuales
-async function pdfBitacora() {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-  let filtered = [...bitData];
-  if (bitStudentFilter === '__general__') {
-    filtered = filtered.filter(b => !b.student_id);
-  } else if (bitStudentFilter) {
-    filtered = filtered.filter(b => b.student_id === bitStudentFilter);
-  }
-  if (bitMonthFilter) {
-    filtered = filtered.filter(b => b.date && b.date.startsWith(bitMonthFilter));
-  }
-
-  const ml = 20, mr = 190;
-  let y = 20;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.setTextColor(233, 27, 126);
-  doc.text('AVERIX PsicoEscolar', 105, y, { align: 'center' });
-  y += 8;
-  doc.setFontSize(12);
-  doc.setTextColor(42, 26, 31);
-  doc.text('Bitácora de Actividades', 105, y, { align: 'center' });
-  y += 5;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(107, 78, 90);
-  if (bitMonthFilter) doc.text(`Período: ${bitMonthFilter}`, 105, y, { align: 'center' });
-  y += 7;
-  doc.setDrawColor(233, 27, 126);
-  doc.line(ml, y, mr, y);
-  y += 8;
-
-  if (filtered.length === 0) {
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(10);
-    doc.text('No hay entradas para el período seleccionado.', ml, y);
-  }
-
-  filtered.forEach((b, idx) => {
-    if (y > 245) { doc.addPage(); y = 20; }
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(11);
-    doc.setTextColor(233, 27, 126);
-    doc.text(`${idx + 1}. ${b.title}`, ml, y);
-    y += 5;
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(42, 26, 31);
-    const dateStr = fmtDate(b.date) + (b.time ? ` ${b.time}` : '');
-    const studentStr = b.students ? b.students.name : 'Entrada General';
-    doc.text(`${dateStr}  |  ${b.type}  |  ${studentStr}`, ml, y);
-    y += 5;
-
-    const descLines = doc.splitTextToSize(b.description || '', 170);
-    doc.text(descLines, ml, y);
-    y += descLines.length * 4 + 2;
-
-    if (b.followup) {
-      doc.setFont('helvetica', 'italic');
-      const followLines = doc.splitTextToSize(`Seguimiento: ${b.followup}`, 170);
-      doc.text(followLines, ml, y);
-      doc.setFont('helvetica', 'normal');
-      y += followLines.length * 4 + 2;
-    }
-
-    doc.setDrawColor(220, 220, 220);
-    doc.line(ml, y + 2, mr, y + 2);
-    y += 7;
-  });
-
-  doc.save(`bitacora-${bitMonthFilter || 'completa'}.pdf`);
-  showToast('PDF generado.', 'success');
-}
-window.pdfBitacora = pdfBitacora;
-
-// Descargar bitácora en WORD
 async function downloadBitacora() {
-  const { data: bitacoras } = await db.from('bitacora').select('*');
-  const { data: students } = await db.from('students').select('*')('students', 'get');
-  
-  const filterStudent = document.getElementById('filter-bitacora-student');
-  const monthFilter = document.getElementById('filter-bitacora-month');
-  
-  const selectedStudentId = filterStudent.value ? parseInt(filterStudent.value) : null;
-  const selectedMonth = monthFilter.value;
-  
-  let filtered = bitacoras;
-  if (selectedStudentId) filtered = filtered.filter(b => b.student_id === selectedStudentId);
-  if (selectedMonth) filtered = filtered.filter(b => b.date && b.date.startsWith(selectedMonth));
-  
-  if (filtered.length === 0) {
-    showToast('No hay entradas para descargar.', 'error');
+  const { data: bitacoras, error } = await db.from('bitacora').select('*').order('date', { ascending: false });
+  const { data: students } = await db.from('students').select('id, name');
+  if (error || !bitacoras || bitacoras.length === 0) {
+    showToast('No hay entradas en la bitácora para descargar.', 'error');
     return;
   }
 
-  const { Document, Packer, Paragraph, HeadingLevel, AlignmentType } = docx;
-  
-  const sections = [
-    new Paragraph({ text: "BITÁCORA PSICOPEDAGÓGICA", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
+  const { Document, Packer, Paragraph, HeadingLevel, AlignmentType, TextRun } = docx;
+
+  const content = [
+    new Paragraph({ text: 'BITÁCORA PSICOPEDAGÓGICA', heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
     new Paragraph({ text: `Generado: ${new Date().toLocaleDateString('es-CL')}`, alignment: AlignmentType.CENTER }),
-    new Paragraph({ text: "" }),
+    new Paragraph({ text: '' }),
   ];
 
-  filtered.forEach((b, index) => {
-    const student = b.student_id ? students.find(s => s.id === b.student_id) : null;
-    sections.push(
-      new Paragraph({ text: `${index + 1}. ${b.title}`, heading: HeadingLevel.HEADING_2 }),
-      new Paragraph({ text: `Fecha: ${new Date(b.date).toLocaleDateString('es-CL')} ${b.time ? '- ' + b.time : ''}` }),
-      new Paragraph({ text: `Tipo: ${b.type}` }),
-      new Paragraph({ text: `Estudiante: ${student?.name || 'Entrada general'}` }),
-      new Paragraph({ text: "" }),
-      new Paragraph({ text: "Descripción:", bold: true }),
-      new Paragraph({ text: b.description }),
-      new Paragraph({ text: "" })
-    );
-    
-    if (b.followup && b.followup.trim()) {
-      sections.push(
-        new Paragraph({ text: "Seguimiento:", bold: true }),
-        new Paragraph({ text: b.followup }),
-        new Paragraph({ text: "" })
-      );
-    }
-    
-    sections.push(
-      new Paragraph({ text: "—".repeat(50) }),
-      new Paragraph({ text: "" })
-    );
-  });
-
-  const doc = new Document({ sections: [{ children: sections }] });
-  Packer.toBlob(doc).then(blob => {
-    saveAs(blob, `Bitacora_${new Date().toISOString().split('T')[0]}.docx`);
-    showToast('Bitácora descargada.', 'success');
-  });
-}
-window.downloadBitacora = downloadBitacora;
-
-async function downloadBitacora() {
-  const { data: bitacoras } = await db.from('bitacora').select('*');
-  const { data: students } = await db.from('students').select('*');
-  if (!bitacoras || bitacoras.length === 0) {
-    showToast('No hay entradas.', 'error');
-    return;
-  }
-  const { Document, Packer, Paragraph, HeadingLevel } = docx;
-  const sections = [new Paragraph({ text: "BITÁCORA", heading: HeadingLevel.HEADING_1 }), new Paragraph({ text: "" })];
   bitacoras.forEach((b, i) => {
     const student = b.student_id ? students?.find(s => s.id === b.student_id) : null;
-    sections.push(
-      new Paragraph({ text: `${i + 1}. ${b.title}`, heading: HeadingLevel.HEADING_2 }),
-      new Paragraph({ text: `Fecha: ${new Date(b.date).toLocaleDateString('es-CL')}` }),
-      new Paragraph({ text: b.description }),
-      new Paragraph({ text: "" })
+    const dateStr = b.date ? new Date(b.date).toLocaleDateString('es-CL') : '';
+    content.push(
+      new Paragraph({ text: `${i + 1}. ${b.title || ''}`, heading: HeadingLevel.HEADING_2 }),
+      new Paragraph({ text: `Fecha: ${dateStr}${b.time ? ' ' + b.time : ''}` }),
+      new Paragraph({ text: `Tipo: ${b.type || ''}` }),
+      new Paragraph({ text: `Estudiante: ${student?.name || 'Entrada general'}` }),
+      new Paragraph({ text: '' }),
+      new Paragraph({ children: [new TextRun({ text: 'Descripción:', bold: true })] }),
+      new Paragraph({ text: b.description || '' }),
+      new Paragraph({ text: '' }),
+    );
+    if (b.followup && b.followup.trim()) {
+      content.push(
+        new Paragraph({ children: [new TextRun({ text: 'Seguimiento:', bold: true })] }),
+        new Paragraph({ text: b.followup }),
+        new Paragraph({ text: '' }),
+      );
+    }
+    content.push(
+      new Paragraph({ text: '─'.repeat(40) }),
+      new Paragraph({ text: '' }),
     );
   });
-  const doc = new Document({ sections: [{ children: sections }] });
-  Packer.toBlob(doc).then(blob => {
+
+  const document = new Document({ sections: [{ children: content }] });
+  Packer.toBlob(document).then(blob => {
     saveAs(blob, `Bitacora_${new Date().toISOString().split('T')[0]}.docx`);
-    showToast('Descargado.', 'success');
-  });
+    showToast('Bitácora descargada en Word.', 'success');
+  }).catch(() => showToast('Error al generar el archivo Word.', 'error'));
 }
 window.downloadBitacora = downloadBitacora;
