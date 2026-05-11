@@ -52,7 +52,7 @@ function switchView(view) {
     case 'activities':    loadActivities();      break;
     case 'meetings':      loadMeetings();        break;
     case 'bitacora':      loadBitacora();        break;
-    case 'reports':       renderReports();       break;
+    case 'reports':       loadReports();       break;
   }
 }
 window.switchView = switchView;
